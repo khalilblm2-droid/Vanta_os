@@ -1,4 +1,4 @@
-import { a, b, c, e, f, d, m, h, j } from "./assets/server-build-BZO8iW4T.js";
+import { a, b, c, e, f, d, m, g, h } from "./assets/server-build-DR3iE_N_.js";
 import "react/jsx-runtime";
 import "node:stream";
 import "@remix-run/node";
@@ -6,9 +6,6 @@ import "@remix-run/react";
 import "isbot";
 import "react-dom/server";
 import "zod";
-import "node:crypto";
-import "node:fs";
-import "node:path";
 import "@shopify/shopify-app-remix/adapters/node";
 import "@shopify/shopify-app-remix/server";
 import "@shopify/shopify-app-session-storage-prisma";
@@ -23,6 +20,9 @@ import "clsx";
 import "tailwind-merge";
 import "react-markdown";
 import "remark-gfm";
+import "node:crypto";
+import "node:fs";
+import "node:path";
 import "@shopify/polaris";
 import "@shopify/polaris-icons";
 export {
@@ -33,7 +33,7 @@ export {
   f as future,
   d as isSpaMode,
   m as mode,
-  h as publicPath,
-  j as routes
+  g as publicPath,
+  h as routes
 };
 //# sourceMappingURL=index.js.map

@@ -1,19 +1,20 @@
 // =============================================================================
-// VANTA OS — Environment loader (Section 13: secrets from vault, never client)
-// Uses the encrypted SecretsVault for sensitive values.
-// Non-sensitive config (URLs, feature flags) comes from process.env directly.
+// VANTA OS — Environment loader
+// All config + secrets come from process.env (Render Dashboard or local .env).
+// Zod validates everything at startup — fail-fast with clear error messages.
 // =============================================================================
 
 import { z } from "zod";
-import { secretsVault, validateSecrets } from "~/lib/security/secrets-vault";
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
   APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
   APP_URL: z.string().url(),
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(10000),
 
-  // Shopify (non-secret config)
+  // Shopify credentials (required)
+  SHOPIFY_API_KEY: z.string().min(1, "SHOPIFY_API_KEY is required"),
+  SHOPIFY_API_SECRET: z.string().min(1, "SHOPIFY_API_SECRET is required"),
   SHOPIFY_APP_URL: z.string().url(),
   SHOPIFY_APP_HANDLE: z.string().default("vanta-os"),
   SHOPIFY_API_VERSION: z.string().default("2025-04"),
@@ -23,7 +24,7 @@ const EnvSchema = z.object({
   SHOPIFY_PARTNER_API_CLIENT_ID: z.string().optional(),
   SHOPIFY_PARTNER_APP_ID: z.string().optional(),
 
-  // Database
+  // Database (required)
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DIRECT_URL: z.string().min(1, "DIRECT_URL is required"),
 
@@ -32,17 +33,29 @@ const EnvSchema = z.object({
   BULLMQ_CONCURRENCY: z.coerce.number().default(4),
   BULLMQ_MAX_RETRIES: z.coerce.number().default(3),
 
-  // Gemini config (non-secret)
+  // Gemini (required)
+  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   GEMINI_MODEL: z.string().default("gemini-2.0-flash-exp"),
   GEMINI_MAX_TOKENS: z.coerce.number().default(8192),
   GEMINI_TEMPERATURE: z.coerce.number().default(0.4),
   GEMINI_TIMEOUT_MS: z.coerce.number().default(60000),
 
-  // Email
+  // Encryption (required)
+  ENCRYPTION_KEY: z.string().min(8, "ENCRYPTION_KEY is required"),
+  ENCRYPTION_SALT: z.string().min(16, "ENCRYPTION_SALT is required"),
+  VAULT_SALT: z.string().min(16, "VAULT_SALT is required"),
+
+  // Internal secrets (required)
+  INTERNAL_DOCS_SECRET: z.string().min(8, "INTERNAL_DOCS_SECRET is required"),
+  AGENCY_SECRET: z.string().min(8, "AGENCY_SECRET is required"),
+
+  // Email (optional)
+  RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("VANTA OS <noreply@vanta-os.example.com>"),
   EMAIL_SUPPORT: z.string().default("support@vanta-os.example.com"),
 
-  // Sentry
+  // Sentry (optional)
+  SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().default("development"),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().default(0.1),
 
@@ -53,22 +66,10 @@ const EnvSchema = z.object({
     .default("false"),
 
   // Feature flags
-  FEATURE_AB_TESTING: z
-    .string()
-    .transform((v) => v === "true")
-    .default("false"),
-  FEATURE_GUARDIAN_MODE: z
-    .string()
-    .transform((v) => v !== "false")
-    .default("true"),
-  FEATURE_VOICE_COMMANDS: z
-    .string()
-    .transform((v) => v !== "false")
-    .default("true"),
-  FEATURE_CSV_ENRICHMENT: z
-    .string()
-    .transform((v) => v !== "false")
-    .default("true"),
+  FEATURE_AB_TESTING: z.string().transform((v) => v === "true").default("false"),
+  FEATURE_GUARDIAN_MODE: z.string().transform((v) => v !== "false").default("true"),
+  FEATURE_VOICE_COMMANDS: z.string().transform((v) => v !== "false").default("true"),
+  FEATURE_CSV_ENRICHMENT: z.string().transform((v) => v !== "false").default("true"),
 
   // Rate limit
   SHOPIFY_RATE_LIMIT_PAUSE_THRESHOLD: z.coerce.number().default(0.15),
@@ -90,45 +91,19 @@ let cachedEnv: Env | null = null;
 export function loadEnv(): Env {
   if (cachedEnv) return cachedEnv;
 
-  // Validate that required secrets exist (fail-fast at startup)
-  const secretCheck = validateSecrets();
-  if (!secretCheck.valid) {
-    console.error("\n[VANTA] ❌ Missing required secrets:");
-    for (const k of secretCheck.missing) {
-      console.error(`   - ${k}`);
-    }
-    console.error("\n[VANTA] Set these as environment variables on your hosting platform.");
-    console.error("[VANTA] NEVER commit secrets to git.\n");
-    // Don't throw in dev — let the app start so devs can see other errors
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(`Missing required secrets: ${secretCheck.missing.join(", ")}`);
-    }
-  }
-
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
     const errors = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
       .join("\n");
-    throw new Error(`❌ Invalid environment configuration:\n${errors}`);
+    console.error("\n[VANTA] ❌ Environment configuration errors:\n" + errors + "\n");
+    throw new Error(`Environment configuration failed. See errors above.`);
   }
   cachedEnv = parsed.data;
   return cachedEnv;
 }
 
-/**
- * Get a secret value from the vault. NEVER logs or serializes the value.
- * Use this instead of process.env.SHOPIFY_API_KEY etc.
- */
-export function getSecret(key: Parameters<typeof secretsVault.get>[0]): string {
-  return secretsVault.get(key);
-}
-
-export function getOptionalSecret(key: Parameters<typeof secretsVault.getOptional>[0]): string | undefined {
-  return secretsVault.getOptional(key);
-}
-
-/** Convenience accessor for non-secret config. */
+/** Convenience accessor. */
 export const env: Env = new Proxy({} as Env, {
   get(_t, prop: string) {
     return loadEnv()[prop as keyof Env];

@@ -14,7 +14,7 @@
     "dev:worker": "tsx watch --tsconfig tsconfig.worker.json app/worker/index.ts",
     "build": "remix vite:build",
     "build:worker": "tsc -p tsconfig.worker.json && esbuild app/worker/index.ts --bundle --platform=node --format=esm --outfile=dist/worker/index.js --external:@prisma/client --external:better-sqlite3",
-    "start": "remix-serve ./build/server/index.js",
+    "start": "node -r dotenv/config node_modules/@remix-run/serve/dist/cli.js ./build/server/index.js",
     "start:worker": "tsx app/worker/index.ts",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
