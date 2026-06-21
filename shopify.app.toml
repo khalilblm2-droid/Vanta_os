@@ -1,0 +1,52 @@
+# =============================================================================
+# VANTA OS — Shopify App Configuration
+# API Version: Pinned to 2025-04
+#
+# ملاحظة: الروابط في هذا الملف تُحدّث تلقائياً عند تشغيل `npm run deploy`
+# عبر سكريبت scripts/sync-toml.ts. لا تعدلها يدوياً — بدّل SHOPIFY_APP_URL في .env
+# =============================================================================
+
+client_id = "REPLACE_WITH_SHOPIFY_API_KEY"
+name = "VANTA OS"
+application_url = "REPLACE_WITH_SHOPIFY_APP_URL"
+embedded = true
+
+# --- Auth & Scopes ---
+[access_scopes]
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_product_listings,read_collections,write_collections,read_metafields,write_metafields,read_themes,read_orders,read_customers,read_price_rules,read_discounts,read_shop_locales,read_markets"
+use_legacy_install_flow = false
+is_embedded = true
+
+# --- Webhooks ---
+[[webhooks]]
+topic = "app/uninstalled"
+endpoint = "/webhooks/app/uninstalled"
+[[webhooks]]
+topic = "customers/redact"
+endpoint = "/webhooks/customers/redact"
+[[webhooks]]
+topic = "customers/data_request"
+endpoint = "/webhooks/customers/data_request"
+[[webhooks]]
+topic = "shop/redact"
+endpoint = "/webhooks/shop/redact"
+[[webhooks]]
+topic = "app/scopes_update"
+endpoint = "/webhooks/app/scopes_update"
+
+[webhooks.privacy_compliance]
+customer_deletion_url = "REPLACE_WITH_SHOPIFY_APP_URL/webhooks/customers/redact"
+customer_data_request_url = "REPLACE_WITH_SHOPIFY_APP_URL/webhooks/customers/data_request"
+shop_deletion_url = "REPLACE_WITH_SHOPIFY_APP_URL/webhooks/shop/redact"
+
+[build]
+include_config_on_deploy = true
+
+[auth]
+redirect_urls = [
+  "REPLACE_WITH_SHOPIFY_APP_URL/auth/callback"
+]
+
+# --- App Pricing ---
+[app_pricing]
+model = "usage"

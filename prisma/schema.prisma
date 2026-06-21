@@ -1,0 +1,1024 @@
+// =============================================================================
+// VANTA OS — Prisma Schema
+// =============================================================================
+// Multi-tenant by design — EVERY query MUST be scoped by shopDomain (Section 44).
+// Encrypted session storage is delegated to @shopify/shopify-app-session-storage-prisma
+// (Section 6 — no hand-rolled encrypted column).
+// =============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =============================================================================
+// Session storage — exact schema required by @shopify/shopify-app-session-storage-prisma
+// Do NOT rename fields/columns or the adapter will break (Section 6).
+// =============================================================================
+model Session {
+  id            String   @id
+  shop          String
+  state         String
+  isOnline      Boolean  @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  onlineAccessInfo String? @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shop])
+  @@index([expires])
+}
+
+// =============================================================================
+// Shop — top-level tenant entity (Section 44: multi-tenant)
+// =============================================================================
+model Shop {
+  id                 String   @id @default(cuid())
+  shopDomain         String   @unique
+  name               String?
+  email              String?
+  countryCode        String?
+  ianaTimezone       String?  // Section 84 — pulled from shop.ianaTimezone
+  defaultLocale      String?  // auto-detected, merchant can override (Section 12)
+  preferredLanguage  String   @default("en") // ar/en override (Section 9.5)
+  plan               ShopPlan @default(FREE)
+  planStatus         String?  // Active Subscription API status (Section 5.3)
+  creditsRemaining   Int      @default(100)
+  creditsUsedCycle   Int      @default(0)
+  cycleResetAt       DateTime?
+
+  installed          Boolean  @default(true)
+  installedAt        DateTime @default(now())
+  uninstalledAt      DateTime?
+  scopes             String?
+
+  // --- Kill Switch (Section 43) ---
+  killSwitchEnabled  Boolean  @default(false)
+  killSwitchReason   String?
+
+  // --- Agent behavior (Section 61) ---
+  agentPersona       AgentPersona @default(PROFESSIONAL)
+  agentTone          String   @default("professional")
+
+  // --- Guardrails — what the agent can touch (Section 8, Section 9.5) ---
+  canWriteProducts       Boolean @default(true)
+  canWriteCollections    Boolean @default(true)
+  canWriteInventory      Boolean @default(true)
+  canWriteMetafields     Boolean @default(true)
+  canWriteThemes         Boolean @default(false)
+  canReadOrders          Boolean @default(false)
+  canReadCustomers       Boolean @default(false)
+  requiresApprovalOnBulk Boolean @default(true)
+  bulkThreshold          Int    @default(10)
+
+  // --- Notification prefs (Section 56) ---
+  notifyOnTaskComplete   Boolean @default(true)
+  notifyOnGuardianAlert  Boolean @default(true)
+  notifyOnError          Boolean @default(true)
+  emailNotifications     Boolean @default(true)
+
+  // --- Onboarding (Section 75) ---
+  completedOnboarding    Boolean @default(false)
+
+  // --- Markets / multi-currency awareness (Section 73) ---
+  marketsEnabled         Boolean @default(false)
+  primaryCurrency        String  @default("USD")
+
+  // --- Guardian mode (Section 34) ---
+  guardianModeEnabled    Boolean @default(true)
+  guardianIntervalHours  Int     @default(6)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  staffMembers       StaffMember[]
+  tasks              Task[]
+  auditLogs          AuditLog[]
+  scopeAuditLogs     ScopeAuditLog[]
+  notifications      Notification[]
+  feedback           Feedback[]
+  featureFlags       FeatureFlag[]
+  recurringMissions  RecurringMission[]
+  guardianAlerts     GuardianAlert[]
+  commandHistory     CommandHistory[]
+  abExperiments      AbExperiment[]
+  undoSnapshots      UndoSnapshot[]
+
+  @@index([shopDomain])
+}
+
+// =============================================================================
+// StaffMember — multi-staff accountability (Section 32)
+// =============================================================================
+model StaffMember {
+  id              String   @id @default(cuid())
+  shopId           String
+  shopDomain      String
+  shopifyStaffId  String
+  name            String?
+  email           String?
+  role            String?  // "owner" / "staff" / "limited"
+  isOwner         Boolean  @default(false)
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  tasks           Task[]
+  commandHistory  CommandHistory[]
+  feedback        Feedback[]
+
+  @@unique([shopDomain, shopifyStaffId])
+  @@index([shopDomain])
+}
+
+// =============================================================================
+// Task — central execution entity (Section 7, Section 10, Section 32, Section 54)
+// =============================================================================
+model Task {
+  id              String      @id @default(cuid())
+  shopId          String
+  shopDomain      String
+  staffId         String?
+  staffMember     StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  // --- Command & context (Section 29 threading, Section 57 language, Section 61 persona) ---
+  command         String      @db.Text
+  language        String      @default("en")
+  persona         AgentPersona @default(PROFESSIONAL)
+  threadParentId  String?     // for threaded context (last 5-10 turns)
+  threadDepth     Int         @default(0)
+
+  // --- State machine (Section 7) ---
+  status          TaskStatus  @default(QUEUED)
+  priority        TaskPriority @default(NORMAL)  // Section 54
+
+  // --- AI meta ---
+  confidenceScore Int?        // 0–100 (Section 58)
+  estimatedCredits Int        @default(1)  // Section 65 cost estimator
+  actualCredits   Int         @default(0)
+
+  // --- Blast radius (Section 30) ---
+  blastRadius     Int         @default(0)
+  blastRadiusDescription String? @db.Text
+  requiresApproval Boolean    @default(false)
+  approvedByStaffId String?
+  approvedAt      DateTime?
+
+  // --- Recurring mission link (Section 33) ---
+  isRecurring     Boolean     @default(false)
+  recurringMissionId String?
+
+  // --- CSV / external data enrichment (Section 36) ---
+  csvAttachmentUrl String?
+
+  // --- Error handling / self-healing (Section 23) ---
+  selfHealAttempts Int        @default(0)
+  errorMessage     String?    @db.Text
+  rawError         Json?
+
+  // --- Result / output ---
+  output          String?     @db.Text
+  outputFormat    String?     @default("markdown")  // Section 26
+  deepLinks       Json?
+
+  // --- A/B testing (Section 37) ---
+  abExperimentId  String?
+
+  // --- Timing ---
+  queuedAt        DateTime    @default(now())
+  thinkingAt      DateTime?
+  executingAt     DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  logs            TaskLog[]
+  diffs           TaskDiff[]
+  undoSnapshots   UndoSnapshot[]
+  abExperiments   AbExperiment[]
+
+  @@index([shopDomain, status])
+  @@index([shopDomain, createdAt])
+  @@index([priority, status])  // for BullMQ priority queue
+  @@index([threadParentId])
+}
+
+// =============================================================================
+// TaskLog — structured logs (Section 7, Section 40)
+// =============================================================================
+model TaskLog {
+  id          String   @id @default(cuid())
+  taskId      String
+  shopDomain  String
+  level       LogLevel @default(INFO)
+  step        String   // "queued" / "thinking" / "executing" / "completed" / "error"
+  message     String   @db.Text
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, timestamp])
+  @@index([shopDomain, timestamp])
+}
+
+// =============================================================================
+// TaskDiff — visual diff viewer for changes (Section 60)
+// =============================================================================
+model TaskDiff {
+  id            String   @id @default(cuid())
+  taskId        String
+  shopDomain    String
+  resourceType  String   // "PRODUCT" / "VARIANT" / "COLLECTION" / "METAFIELD"
+  resourceId    String
+  resourceTitle String?
+  field         String   // e.g. "price" / "title" / "tags"
+  before        String?  @db.Text
+  after         String?  @db.Text
+  timestamp     DateTime @default(now())
+
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([shopDomain, resourceType, resourceId])
+}
+
+// =============================================================================
+// UndoSnapshot — previous state for instant rollback (Section 22)
+// =============================================================================
+model UndoSnapshot {
+  id            String   @id @default(cuid())
+  taskId        String
+  shopId        String
+  shopDomain    String
+  resourceType  String
+  resourceId    String
+  previousState Json
+  revertedAt    DateTime?
+  revertTaskId  String?
+  createdAt     DateTime @default(now())
+
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([shopDomain, resourceType])
+}
+
+// =============================================================================
+// CommandHistory — last 20 commands per shop (Section 50)
+// =============================================================================
+model CommandHistory {
+  id          String   @id @default(cuid())
+  shopId      String
+  shopDomain  String
+  staffId     String?
+  staffMember StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  command     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+}
+
+// =============================================================================
+// AuditLog — accountability for all actions (Section 32)
+// =============================================================================
+model AuditLog {
+  id            String   @id @default(cuid())
+  shopId        String
+  shopDomain    String
+  staffId       String?
+  taskId        String?
+  action        String
+  resourceType  String?
+  resourceId    String?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  timestamp     DateTime @default(now())
+
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, timestamp])
+  @@index([taskId])
+}
+
+// =============================================================================
+// ScopeAuditLog — granular permission audit (Section 62)
+// =============================================================================
+model ScopeAuditLog {
+  id          String   @id @default(cuid())
+  shopId      String
+  shopDomain  String
+  scope       String   // e.g. "write_products", "read_orders"
+  taskId      String?
+  endpoint    String?
+  timestamp   DateTime @default(now())
+
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, scope, timestamp])
+}
+
+// =============================================================================
+// Notification — persistent notification center (Section 78)
+// =============================================================================
+model Notification {
+  id          String   @id @default(cuid())
+  shopId      String
+  shopDomain  String
+  type        NotificationType
+  title       String
+  body        String   @db.Text
+  link        String?
+  read        Boolean  @default(false)
+  severity    NotificationSeverity @default(INFO)
+  createdAt   DateTime @default(now())
+
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, read, createdAt])
+}
+
+// =============================================================================
+// Feedback — in-app feedback widget (Section 82)
+// =============================================================================
+model Feedback {
+  id            String   @id @default(cuid())
+  shopId        String
+  shopDomain    String
+  staffId       String?
+  staffMember   StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  rating        Int      // 1–5
+  message       String?  @db.Text
+  screenshotUrl String?
+  userAgent     String?
+  page          String?
+  createdAt     DateTime @default(now())
+
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, createdAt])
+}
+
+// =============================================================================
+// FeatureFlag — per-store feature gating (Section 70)
+// =============================================================================
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String
+  shopId      String
+  shopDomain  String
+  enabled     Boolean  @default(false)
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopDomain, key])
+  @@index([shopDomain])
+}
+
+// =============================================================================
+// RecurringMission — cron automations (Section 33, Section 84)
+// =============================================================================
+model RecurringMission {
+  id            String   @id @default(cuid())
+  shopId        String
+  shopDomain    String
+  prompt        String   @db.Text
+  cron          String   // e.g. "0 0 * * 5" — every Friday midnight
+  timezone      String   @default("UTC")  // Section 84 — store's ianaTimezone
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  runCount      Int      @default(0)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, enabled, nextRunAt])
+}
+
+// =============================================================================
+// GuardianAlert — proactive alerts (Section 34)
+// =============================================================================
+model GuardianAlert {
+  id          String   @id @default(cuid())
+  shopId      String
+  shopDomain  String
+  type        String   // "PRICE_ZERO" / "LOW_INVENTORY" / "BROKEN_LINK"
+  severity    String   @default("warning")
+  title       String
+  description String   @db.Text
+  payload     Json?
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  fixTaskId   String?
+  createdAt   DateTime @default(now())
+
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, resolved, createdAt])
+}
+
+// =============================================================================
+// AbExperiment — A/B testing for agent actions (Section 37)
+// =============================================================================
+model AbExperiment {
+  id            String   @id @default(cuid())
+  shopId        String
+  shopDomain    String
+  parentTaskId  String
+  variantA      Json
+  variantB      Json
+  cohortACount  Int      @default(0)
+  cohortBCount  Int      @default(0)
+  metricA       Float?
+  metricB       Float?
+  winner        String?  // "A" / "B" / null
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  createdAt     DateTime @default(now())
+
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  parentTask    Task     @relation(fields: [parentTaskId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, endedAt])
+}
+
+// =============================================================================
+// ProcessedWebhook — idempotency for webhook retries (Section 76)
+// =============================================================================
+model ProcessedWebhook {
+  id            String   @id @default(cuid())
+  webhookId     String   @unique  // X-Shopify-Webhook-Id header
+  topic         String
+  shopDomain    String
+  apiVersion    String
+  payload       Json?
+  processedAt   DateTime @default(now())
+
+  @@index([shopDomain, topic, processedAt])
+}
+
+// =============================================================================
+// KnowledgeBaseEntry — self-documenting why-actions (Section 35)
+// =============================================================================
+model KnowledgeBaseEntry {
+  id          String   @id @default(cuid())
+  shopDomain  String
+  taskId      String
+  question    String   @db.Text  // "Why are my prices different?"
+  answer      String   @db.Text
+  evidence    Json?    // related task logs / diffs
+  createdAt   DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+}
+
+// =============================================================================
+// RateLimitSnapshot — API health visibility (Section 53, Section 19)
+// =============================================================================
+model RateLimitSnapshot {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  throttleStatus  Json     // extensions.cost.throttleStatus
+  currentlyAvailable Int
+  restoreRate     Float
+  requestedQueryCost Int
+  actualQueryCost  Int
+  recordedAt      DateTime @default(now())
+
+  @@index([shopDomain, recordedAt])
+}
+
+// =============================================================================
+// AppEvent — usage metering for App Events API (Section 5.3)
+// =============================================================================
+model AppEvent {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  taskId          String?
+  eventName       String   // "CREDIT_USED" / "TASK_COMPLETED" / "TASK_FAILED"
+  credits         Int      @default(0)
+  reportedToShopify Boolean @default(false)
+  reportedAt      DateTime?
+  payload         Json?
+  createdAt       DateTime @default(now())
+
+  @@index([shopDomain, reportedToShopify, createdAt])
+}
+
+// =============================================================================
+// Goal — high-level merchant objective ("Build my dropshipping business")
+// =============================================================================
+model Goal {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  staffId         String?
+  title           String
+  description     String   @db.Text
+  status          String   @default("ACTIVE") // ACTIVE / PAUSED / COMPLETED / FAILED / CANCELLED
+  priority        String   @default("NORMAL") // LOW / NORMAL / HIGH / URGENT
+  successCriteria String?  @db.Text // measurable outcome definition
+  parentGoalId    String?  // for hierarchical goals
+  // Progress tracking
+  progress        Float    @default(0) // 0-1
+  totalSteps      Int      @default(0)
+  completedSteps  Int      @default(0)
+  failedSteps     Int      @default(0)
+  // Autonomous execution config
+  autonomyLevel   String   @default("ASSISTED") // ASSISTED / SUPERVISED / AUTONOMOUS
+  // Risk management
+  riskScore       Float    @default(0) // 0-1
+  riskReasoning   String?  @db.Text
+  // Timing
+  estimatedDurationMin Int?
+  deadline        DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  plans           Plan[]
+  decisions       DecisionRecord[]
+
+  @@index([shopDomain, status])
+  @@index([shopDomain, priority])
+}
+
+// =============================================================================
+// Plan — multi-step execution plan for a goal
+// =============================================================================
+model Plan {
+  id              String   @id @default(cuid())
+  goalId          String
+  shopDomain      String
+  version         Int      @default(1) // plans can be revised
+  reasoning       String?  @db.Text // why this plan
+  status          String   @default("DRAFT") // DRAFT / APPROVED / EXECUTING / COMPLETED / FAILED / SUPERSEDED
+  // The plan itself (ordered steps)
+  // Each step: { id, agent, action, dependsOn[], estimatedCost, riskLevel }
+  totalSteps      Int      @default(0)
+  completedSteps  Int      @default(0)
+  // Self-healing
+  revisionCount   Int      @default(0)
+  lastRevisionReason String? @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  goal            Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  steps           PlanStep[]
+  decisions       DecisionRecord[]
+
+  @@index([goalId, version])
+  @@index([shopDomain, status])
+}
+
+// =============================================================================
+// PlanStep — individual executable step in a plan
+// =============================================================================
+model PlanStep {
+  id              String   @id @default(cuid())
+  planId          String
+  shopDomain      String
+  stepNumber      Int
+  agent           String   // which agent executes this (planner / research / product_hunter / etc.)
+  action          String   @db.Text // what to do
+  // Dependencies
+  dependsOn       String[] // IDs of steps that must complete first
+  // Execution
+  taskId          String?  // linked Task once executed
+  status          String   @default("PENDING") // PENDING / READY / RUNNING / COMPLETED / FAILED / SKIPPED / BLOCKED
+  // Resumption support
+  checkpoint      Json?    // state to resume from if failed
+  attemptCount    Int      @default(0)
+  maxAttempts     Int      @default(3)
+  // Outcome
+  result          Json?
+  errorMessage    String?  @db.Text
+  // Risk + cost
+  riskLevel       String   @default("LOW") // LOW / MEDIUM / HIGH / CRITICAL
+  estimatedCredits Int     @default(1)
+  actualCredits   Int      @default(0)
+  // Timing
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  plan            Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, stepNumber])
+  @@index([shopDomain, status])
+}
+
+// =============================================================================
+// DecisionRecord — every autonomous decision logged for audit + learning
+// =============================================================================
+model DecisionRecord {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  goalId          String?
+  planId          String?
+  stepId          String?
+  taskId          String?
+  // The decision
+  decisionType    String   // EXECUTE / SKIP / RETRY / REVISE / ESCALATE / ROLLBACK
+  reasoning       String   @db.Text
+  alternatives    String[] // what else was considered
+  confidence      Float    // 0-1
+  // Outcome (filled in after action)
+  outcome         String?  // SUCCESS / FAILURE / PARTIAL / PENDING
+  outcomeReasoning String? @db.Text
+  // Learning signal
+  rewardScore     Float?   // -1 to 1 (RL-style feedback)
+  // Approval
+  requiresApproval Boolean  @default(false)
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  goal            Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  plan            Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([shopDomain, createdAt])
+  @@index([goalId])
+}
+
+// =============================================================================
+// AgentMessage — inter-agent communication bus
+// =============================================================================
+model AgentMessage {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  goalId          String?
+  fromAgent       String   // planner / research / product_hunter / etc.
+  toAgent         String   // target agent or "broadcast"
+  messageType     String   // REQUEST / RESPONSE / FINDING / QUESTION / HANDOFF
+  content         String   @db.Text
+  metadata        Json?
+  // Threading
+  parentMessageId String?
+  createdAt       DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+  @@index([toAgent, createdAt])
+  @@index([goalId])
+}
+
+// =============================================================================
+// ProductOpportunity — discovered product candidates for dropshipping
+// =============================================================================
+model ProductOpportunity {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  // Source
+  source          String   // ALIEXPRESS / DSERS / TREND / COMPETITOR / MANUAL
+  sourceUrl       String?
+  sourceProductId String?
+  // Product info
+  title           String
+  description     String?  @db.Text
+  imageUrl        String?
+  category        String?
+  // Economics
+  supplierCost    Float?
+  suggestedPrice  Float?
+  estimatedMargin Float?
+  estimatedMarginPercent Float?
+  // Evaluation
+  demandScore     Float    @default(0) // 0-100
+  competitionScore Float   @default(0) // 0-100 (higher = more competition)
+  trendScore      Float    @default(0) // 0-100
+  overallScore    Float    @default(0) // weighted composite
+  // AI reasoning
+  reasoning       String?  @db.Text
+  risks           String[] // ["high_shipping_time", "low_margin", "saturated_market"]
+  // Status
+  status          String   @default("DISCOVERED") // DISCOVERED / EVALUATED / APPROVED / IMPORTED / REJECTED
+  approvedBy      String?
+  approvedAt      DateTime?
+  // Link to actual product if imported
+  shopifyProductId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shopDomain, status, overallScore])
+  @@index([shopDomain, source])
+}
+
+// =============================================================================
+// Memory — long-term semantic memory (replaces lost VectorMemory)
+// =============================================================================
+model Memory {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  memoryType      String   // PREFERENCE / DECISION / OUTCOME / PATTERN / FACT / LESSON
+  content         String   @db.Text
+  summary         String?  @db.Text
+  // Semantic embedding (stored as float array — pgvector-compatible)
+  embedding       Float[]
+  // Provenance
+  sourceType      String?  // TASK / GOAL / OBSERVATION / FEEDBACK
+  sourceId        String?
+  // Importance + decay
+  importance      Float    @default(0.5) // 0-1
+  confidence      Float    @default(0.5) // 0-1
+  accessCount     Int      @default(0)
+  lastAccessedAt  DateTime?
+  // Outcome tracking (for decisions)
+  outcomePositive Boolean?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shopDomain, memoryType])
+  @@index([shopDomain, importance])
+}
+
+// =============================================================================
+// AgentTrace — observability for multi-agent runs (Phase G)
+// =============================================================================
+model AgentTrace {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  goalId          String?
+  planId          String?
+  stepId          String?
+  taskId          String?
+  // Span info
+  traceId         String   @unique
+  parentSpanId    String?
+  agentName       String
+  spanName        String
+  spanType        String   // LLM / TOOL / HTTP / AGENT / DECISION
+  // Content
+  input           Json?
+  output          Json?
+  thinkingTrace   String?  @db.Text // chain-of-thought for debugging
+  metadata        Json?
+  // Timing + cost
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  durationMs      Int?
+  tokenCount      Int?
+  costCredits     Int?
+  // Status
+  status          String   @default("OK") // OK / ERROR / TIMEOUT / CANCELLED
+  errorMessage    String?
+
+  @@index([shopDomain, goalId, startTime])
+  @@index([shopDomain, agentName, startTime])
+  @@index([shopDomain, status])
+}
+
+// =============================================================================
+// Risk Assessment — per-action risk scoring (Phase F)
+// =============================================================================
+model RiskAssessment {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  goalId          String?
+  planId          String?
+  stepId          String?
+  taskId          String?
+  // Risk scoring
+  riskScore       Float    // 0-1
+  riskLevel       String   // LOW / MEDIUM / HIGH / CRITICAL
+  // Factors
+  factors         Json     // { factor: score } e.g. { "irreversible": 0.8, "affects_many": 0.6 }
+  // Mitigation
+  mitigations     String[]
+  requiresApproval Boolean  @default(false)
+  // Preview (what WILL happen)
+  actionPreview   String?  @db.Text
+  affectedResources String[] // product IDs etc.
+  // Decision
+  decision        String?  // PROCEED / APPROVE / MODIFY / REJECT
+  decidedBy       String?
+  decidedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([shopDomain, riskLevel])
+  @@index([shopDomain, createdAt])
+}
+
+// =============================================================================
+// ConnectedAccount — merchant-owned external accounts (DSers, AliExpress, etc.)
+// The merchant owns these accounts. VANTA only operates them after authorization.
+// =============================================================================
+model ConnectedAccount {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  staffId         String?
+  // Account type
+  accountType     String   // DSERS / ALIEXPRESS / SUPPLIER / LOGISTICS / MARKETING / CUSTOM
+  accountName     String   // human-friendly label
+  // Credentials (encrypted at rest via quantum/crypto.ts)
+  encryptedCredentials String @db.Text
+  credentialVersion Int    @default(1)
+  // Connection status
+  status          String   @default("PENDING") // PENDING / CONNECTED / EXPIRED / REVOKED / ERROR
+  lastVerifiedAt  DateTime?
+  lastError       String?  @db.Text
+  // Authorization
+  authorizedBy    String?
+  authorizedAt    DateTime?
+  scopes          String[] // what VANTA is allowed to do with this account
+  // Metadata
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  browserSessions   BrowserSession[]
+  browserWorkflows  BrowserWorkflow[]
+
+  @@unique([shopDomain, accountType, accountName])
+  @@index([shopDomain, status])
+}
+
+// =============================================================================
+// BrowserSession — isolated browser session per merchant per connected account
+// =============================================================================
+model BrowserSession {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  connectedAccountId String?
+  // Session identity
+  sessionKey      String   @unique // shopDomain:accountType:random
+  // State
+  status          String   @default("IDLE") // IDLE / RUNNING / PAUSED / CLOSED / ERROR
+  // Persistence
+  storageState    Json?    // cookies + localStorage (encrypted in app layer)
+  userAgent       String?
+  viewport        Json?
+  // Context
+  currentUrl      String?
+  lastActivityAt  DateTime?
+  // Lifecycle
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  // Error tracking
+  errorMessage    String?  @db.Text
+  retryCount      Int      @default(0)
+
+  connectedAccount ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+
+  workflows       BrowserWorkflow[]
+  actions         BrowserAction[]
+
+  @@index([shopDomain, status])
+  @@index([connectedAccountId])
+}
+
+// =============================================================================
+// BrowserWorkflow — multi-step browser automation sequence
+// =============================================================================
+model BrowserWorkflow {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  goalId          String?
+  planStepId      String?
+  sessionId       String?
+  connectedAccountId String?
+  // Workflow definition
+  name            String
+  description     String?  @db.Text
+  // Steps: [{ id, action, selector, value, waitFor, screenshot, condition }]
+  steps           Json[]
+  // Execution state
+  status          String   @default("PENDING") // PENDING / RUNNING / PAUSED / COMPLETED / FAILED / AWAITING_APPROVAL
+  currentStep     Int      @default(0)
+  // Resumption
+  checkpoint      Json?    // state for resuming after failure
+  attemptCount    Int      @default(0)
+  maxAttempts     Int      @default(3)
+  // Outcome
+  result          Json?
+  errorMessage    String?  @db.Text
+  // Approval
+  requiresApproval Boolean  @default(true)
+  approvedBy      String?
+  approvedAt      DateTime?
+  // Timing
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  session         BrowserSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  connectedAccount ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+  actions         BrowserAction[]
+
+  @@index([shopDomain, status])
+  @@index([goalId])
+}
+
+// =============================================================================
+// BrowserAction — individual action executed within a browser workflow
+// Full audit trail of every click, input, navigation, and screenshot.
+// =============================================================================
+model BrowserAction {
+  id              String   @id @default(cuid())
+  shopDomain      String
+  sessionId       String?
+  workflowId      String?
+  // Action details
+  stepNumber      Int
+  actionType      String   // NAVIGATE / CLICK / INPUT / SELECT / WAIT / SCREENSHOT / SCROLL / DOWNLOAD / UPLOAD / EXTRACT
+  target          String?  // CSS selector or URL
+  value           String?  @db.Text // input value or extracted data
+  // Result
+  status          String   @default("PENDING") // PENDING / SUCCESS / FAILED / SKIPPED
+  resultData      Json?
+  screenshotUrl   String?
+  errorMessage    String?  @db.Text
+  // Timing
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+  createdAt       DateTime @default(now())
+
+  session         BrowserSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  workflow        BrowserWorkflow? @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, stepNumber])
+  @@index([shopDomain, createdAt])
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+enum ShopPlan {
+  FREE
+  GROWTH
+  PRO
+  PRIVATE_TEST  // Section 5.3 — always-available $0 dev plan
+}
+
+enum AgentPersona {
+  PROFESSIONAL
+  FRIENDLY
+  CONCISE
+}
+
+enum TaskStatus {
+  QUEUED
+  THINKING
+  EXECUTING
+  AWAITING_APPROVAL
+  COMPLETED
+  ERROR
+  CANCELLED
+  REVERTED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum NotificationType {
+  TASK_QUEUED
+  TASK_COMPLETED
+  TASK_FAILED
+  TASK_REVERTED
+  GUARDIAN_ALERT
+  BILLING_EVENT
+  SYSTEM
+}
+
+enum NotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}

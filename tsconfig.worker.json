@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "noEmit": false,
+    "declaration": false,
+    "outDir": "./dist/worker",
+    "rootDir": "."
+  },
+  "include": [
+    "app/worker/**/*",
+    "app/lib/ai/**/*",
+    "app/lib/shopify/**/*",
+    "app/lib/db.server.ts",
+    "app/lib/env.server.ts",
+    "app/lib/logger.server.ts",
+    "app/lib/queue/**/*",
+    "prisma/client.ts"
+  ]
+}

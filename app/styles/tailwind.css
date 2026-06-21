@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+ * VANTA OS — Tailwind layer (Section 24, Section 46)
+ * Polaris theme attribute `data-polaris-theme="dark"` drives our dark mode.
+ * Skeleton shimmer animation for Section 46.
+ * ========================================================================== */
+
+@layer base {
+  :root {
+    --vanta-bg: 245 247 250;
+    --vanta-fg: 26 34 56;
+    --vanta-accent: 124 92 255;
+    --vanta-card-bg: 255 255 255;
+    --vanta-card-border: 207 216 232;
+    --vanta-muted: 100 116 139;
+  }
+
+  [data-polaris-theme="dark"] {
+    --vanta-bg: 15 20 36;
+    --vanta-fg: 245 247 250;
+    --vanta-accent: 168 146 255;
+    --vanta-card-bg: 26 34 56;
+    --vanta-card-border: 45 58 92;
+    --vanta-muted: 148 163 184;
+  }
+
+  html,
+  body {
+    background-color: rgb(var(--vanta-bg));
+    color: rgb(var(--vanta-fg));
+    font-family: "Inter", "Polaris-Regular", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Section 12 — RTL support */
+  [dir="rtl"] body {
+    font-family: "IBM Plex Sans Arabic", "Tajawal", "Inter", system-ui, sans-serif;
+  }
+
+  /* Section 47 — focus ring */
+  *:focus-visible {
+    outline: 2px solid rgb(var(--vanta-accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .vanta-card {
+    background-color: rgb(var(--vanta-card-bg));
+    border: 1px solid rgb(var(--vanta-card-border));
+    border-radius: 12px;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .vanta-glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  [data-polaris-theme="dark"] .vanta-glass {
+    background: rgba(26, 34, 56, 0.55);
+    border: 1px solid rgba(168, 146, 255, 0.15);
+  }
+
+  .vanta-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(207, 216, 232, 0.1) 0%,
+      rgba(207, 216, 232, 0.25) 20%,
+      rgba(207, 216, 232, 0.4) 60%,
+      rgba(207, 216, 232, 0.1) 100%
+    );
+    background-size: 1000px 100%;
+    animation: vanta-shimmer 1.6s linear infinite;
+    border-radius: 8px;
+  }
+
+  [data-polaris-theme="dark"] .vanta-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(45, 58, 92, 0.1) 0%,
+      rgba(45, 58, 92, 0.3) 20%,
+      rgba(45, 58, 92, 0.5) 60%,
+      rgba(45, 58, 92, 0.1) 100%
+    );
+    background-size: 1000px 100%;
+  }
+
+  @keyframes vanta-shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+}
+
+@layer utilities {
+  .text-vanta-muted {
+    color: rgb(var(--vanta-muted));
+  }
+  .bg-vanta-bg {
+    background-color: rgb(var(--vanta-bg));
+  }
+  .border-vanta-border {
+    border-color: rgb(var(--vanta-card-border));
+  }
+}

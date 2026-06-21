@@ -1,0 +1,265 @@
+{
+  "app": {
+    "name": "VANTA OS",
+    "tagline": "The Operating System for Your Shopify Store",
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "canvas": "Agent Canvas",
+    "history": "Task History",
+    "automations": "Automations",
+    "guardian": "Guardian",
+    "settings": "Settings",
+    "billing": "Billing & Plans",
+    "help": "Help & Support",
+    "data": "Data Controls",
+    "agency": "Agency Dashboard"
+  },
+  "onboarding": {
+    "title": "Welcome to VANTA OS",
+    "subtitle": "Your AI agent for Shopify. Read the docs, accept the terms, and connect your store.",
+    "privacyLink": "Read the Privacy Policy",
+    "termsLink": "Read the Terms of Service",
+    "consentLabel": "I have read and accept the Privacy Policy and Terms of Service",
+    "connect": "Connect my store",
+    "connectDisabled": "Accept the terms to continue",
+    "tour": "Take the guided tour"
+  },
+  "canvas": {
+    "title": "Agent Canvas",
+    "subtitle": "Tell VANTA what to do — it plans, confirms, and executes.",
+    "placeholder": "Ask VANTA to do anything... (e.g. 'Find all products with 0 inventory')",
+    "submit": "Send to agent",
+    "charCount": "{count}/{max} characters",
+    "estimatedCost": "Est. {credits} credit(s)",
+    "voice": "Voice input",
+    "priority": {
+      "label": "Priority",
+      "LOW": "Low",
+      "NORMAL": "Normal",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "starters": {
+      "title": "Try one of these to get started",
+      "1": "Find all products with 0 inventory",
+      "2": "Draft Arabic SEO descriptions for my latest 10 products",
+      "3": "Analyze yesterday's failed orders and summarize why",
+      "4": "Add a 'Restocking Soon' tag to out-of-stock items"
+    },
+    "offline": {
+      "title": "You are offline",
+      "body": "Tasks already submitted are safely executing in the cloud."
+    },
+    "duplicate": "This task is already running. Please wait for it to complete before submitting again."
+  },
+  "task": {
+    "states": {
+      "QUEUED": "Queued",
+      "THINKING": "Thinking",
+      "EXECUTING": "Executing",
+      "AWAITING_APPROVAL": "Needs your approval",
+      "COMPLETED": "Completed",
+      "ERROR": "Failed",
+      "CANCELLED": "Cancelled",
+      "REVERTED": "Reverted"
+    },
+    "confidence": "Agent confidence: {score}%",
+    "lowConfidence": "I'm not fully certain I understood correctly — please review carefully before approving.",
+    "blastRadius": "This action will affect {count} item(s): {description}",
+    "approve": "Approve & execute",
+    "reject": "Cancel",
+    "undo": "Undo this action",
+    "viewDiff": "View changes",
+    "viewLogs": "View logs",
+    "printReport": "Print / Export PDF",
+    "retry": "Retry",
+    "needsInput": "Needs your input",
+    "initiatedBy": "Initiated by {staff}"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageHint": "Override the auto-detected store locale.",
+    "persona": "Agent tone",
+    "personaOptions": {
+      "PROFESSIONAL": "Professional",
+      "FRIENDLY": "Friendly",
+      "CONCISE": "Concise"
+    },
+    "permissions": "Agent permissions",
+    "permissionsHint": "Choose what the agent is allowed to touch. Changes take effect immediately.",
+    "canWriteProducts": "Create / edit products",
+    "canWriteCollections": "Create / edit collections",
+    "canWriteInventory": "Adjust inventory levels",
+    "canWriteMetafields": "Write metafields (SEO, custom fields)",
+    "canWriteThemes": "Edit theme files",
+    "canReadOrders": "Read orders",
+    "canReadCustomers": "Read customers",
+    "requiresApprovalOnBulk": "Require approval before bulk actions",
+    "bulkThreshold": "Bulk action threshold (items)",
+    "killSwitch": {
+      "title": "Emergency Kill Switch",
+      "label": "Disable agent globally",
+      "hint": "When enabled, the agent aborts all pending tasks and rejects new input. Use this if you suspect the agent is misbehaving.",
+      "reasonLabel": "Reason (optional, for your team's audit log)"
+    },
+    "guardian": {
+      "title": "Guardian Mode",
+      "label": "Run proactive checks",
+      "hint": "VANTA scans your store every 6 hours for $0 prices, low inventory, and broken links.",
+      "intervalLabel": "Check interval (hours)"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "onTaskComplete": "Notify me when tasks complete",
+      "onGuardianAlert": "Notify me about Guardian alerts",
+      "onError": "Notify me about errors",
+      "email": "Send email summaries"
+    },
+    "saved": "Settings saved.",
+    "connection": {
+      "title": "Connected account",
+      "reauth": "Re-authorize",
+      "status": {
+        "ok": "Connected",
+        "expired": "Session expired — re-authorize"
+      }
+    }
+  },
+  "billing": {
+    "title": "Billing & Plans",
+    "currentPlan": "Current plan",
+    "creditsRemaining": "Credits remaining this cycle",
+    "creditsUsed": "Credits used this cycle",
+    "cycleResets": "Cycle resets on {date}",
+    "upgrade": "Upgrade plan",
+    "manage": "Manage in Shopify",
+    "plans": {
+      "FREE": "Free",
+      "GROWTH": "Growth",
+      "PRO": "Pro",
+      "PRIVATE_TEST": "Private Test"
+    }
+  },
+  "guardian": {
+    "title": "Guardian Alerts",
+    "subtitle": "VANTA proactively watches your store for issues. Review and fix in one click.",
+    "noAlerts": "No active alerts. Your store is in good shape.",
+    "fixNow": "Fix now",
+    "resolve": "Mark as resolved",
+    "types": {
+      "PRICE_ZERO": "Zero-price product",
+      "LOW_INVENTORY": "Low inventory",
+      "BROKEN_LINK": "Broken link"
+    }
+  },
+  "automations": {
+    "title": "Recurring Missions",
+    "subtitle": "Turn a one-time command into a scheduled automation that runs on autopilot.",
+    "new": "New mission",
+    "promptLabel": "Prompt",
+    "cronLabel": "Schedule (cron)",
+    "tzLabel": "Timezone",
+    "save": "Save mission",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "lastRun": "Last run: {date}",
+    "nextRun": "Next run: {date}",
+    "empty": "No automations yet. Run a task, then click 'Save as Automation' to schedule it."
+  },
+  "history": {
+    "title": "Task History",
+    "subtitle": "Every command, every change, every staff member — fully accountable.",
+    "search": "Search tasks...",
+    "empty": "No tasks yet. Submit your first command on the Agent Canvas.",
+    "filterAll": "All",
+    "filterCompleted": "Completed",
+    "filterFailed": "Failed",
+    "filterReverted": "Reverted"
+  },
+  "data": {
+    "title": "Data & Account Controls",
+    "subtitle": "Export or delete all data VANTA holds about your store. Complements the mandatory GDPR webhooks.",
+    "export": "Export my data",
+    "delete": "Delete all my data",
+    "deleteConfirm": "This permanently deletes ALL data tied to {shop}. This cannot be undone. Continue?",
+    "exportReady": "Your export is ready. We've also notified the shop owner by email."
+  },
+  "help": {
+    "title": "Help & Support",
+    "subtitle": "Documentation, FAQs, and changelog.",
+    "docs": "Open documentation",
+    "contact": "Contact support",
+    "faq": "Frequently asked questions",
+    "changelog": "What's new in VANTA OS",
+    "version": "Version {version}",
+    "copyright": "© {year} {holder}. All rights reserved."
+  },
+  "legal": {
+    "privacyTitle": "Privacy Policy",
+    "termsTitle": "Terms of Service",
+    "draftNotice": "DRAFT — Generated as a strong starting point. Have your lawyer review before production use.",
+    "lastUpdated": "Last updated: {date}"
+  },
+  "toasts": {
+    "taskQueued": "Task queued — VANTA is on it.",
+    "taskCompleted": "Task completed.",
+    "taskFailed": "Task failed. See details.",
+    "taskReverted": "Changes reverted.",
+    "guardianAlert": "Guardian alert: {title}",
+    "settingsSaved": "Settings saved.",
+    "offline": "You are offline. Cloud tasks continue running.",
+    "online": "Back online. Refreshing status...",
+    "sessionRefreshed": "Session refreshed — your action was completed."
+  },
+  "commandPalette": {
+    "placeholder": "Type a command or search...",
+    "hint": "Press Enter to send to agent · Esc to close",
+    "groups": {
+      "actions": "Quick actions",
+      "navigate": "Navigate",
+      "settings": "Settings"
+    },
+    "actions": {
+      "newTask": "Start a new task",
+      "goDashboard": "Go to Dashboard",
+      "goCanvas": "Go to Agent Canvas",
+      "goHistory": "Go to Task History",
+      "goSettings": "Go to Settings",
+      "goBilling": "Go to Billing",
+      "toggleKillSwitch": "Toggle Kill Switch",
+      "openHelp": "Open Help"
+    }
+  },
+  "feedback": {
+    "button": "Feedback",
+    "title": "Send feedback",
+    "rating": "How was your experience?",
+    "message": "Tell us more (optional)",
+    "submit": "Submit feedback",
+    "thanks": "Thanks for your feedback!"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "empty": "You're all caught up.",
+    "unread": "{count} unread"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Something went wrong.",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "yes": "Yes",
+    "no": "No",
+    "search": "Search"
+  }
+}

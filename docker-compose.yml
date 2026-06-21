@@ -1,0 +1,88 @@
+# =============================================================================
+# VANTA OS — Docker Compose (Section 69)
+# One command: `docker compose up` spins up web + worker + Postgres + Redis
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vanta
+      POSTGRES_PASSWORD: vanta
+      POSTGRES_DB: vanta_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - vanta_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vanta -d vanta_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - vanta_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DATABASE_URL: "postgresql://vanta:vanta@postgres:5432/vanta_os?schema=public&connection_limit=10&pool_timeout=10"
+      DIRECT_URL: "postgresql://vanta:vanta@postgres:5432/vanta_os?schema=public"
+      REDIS_URL: "redis://redis:6379"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm run start"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DATABASE_URL: "postgresql://vanta:vanta@postgres:5432/vanta_os?schema=public&connection_limit=5&pool_timeout=10"
+      DIRECT_URL: "postgresql://vanta:vanta@postgres:5432/vanta_os?schema=public"
+      REDIS_URL: "redis://redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    command: ["npm", "run", "start:worker"]
+
+volumes:
+  vanta_pgdata:
+  vanta_redisdata:

@@ -1,0 +1,78 @@
+{
+  "name": "VANTA OS",
+  "tagline": "The Operating System for Your Shopify Store",
+  "description": "VANTA OS is an autonomous AI commerce operating system that manages your Shopify store for you. Tell it what you want — 'Find winning products,' 'Optimize my SEO,' 'Restock low inventory' — and VANTA plans, executes, and monitors every action with full transparency, undo, and human approval gates.\n\nKey features:\n• Natural language command interface (English, Arabic, French)\n• 7 specialized AI agents running 24/7 (Inventory, Pricing, SEO, Marketing, Fraud, Trends, A/B Testing)\n• Multi-step goal execution with self-healing workflows\n• One-click undo for every action\n• Blast-radius checks before bulk operations\n• Predictive demand forecasting\n• Competitor price intelligence\n• Long-term semantic memory (RAG)\n• Full audit trail for every decision\n• Kill switch for emergency shutdown\n• WCAG 2.1 AA accessible\n• Dark/light theme synced with Shopify Admin\n• MCP Server — connect ChatGPT/Claude to your store",
+  "category": "Store automation",
+  "pricing": [
+    {
+      "plan": "Free",
+      "price": "$0/month",
+      "description": "100 AI credits per month. Perfect for evaluation."
+    },
+    {
+      "plan": "Growth",
+      "price": "$29/month",
+      "description": "1,000 AI credits. Full agent suite, predictive analytics, Guardian Mode."
+    },
+    {
+      "plan": "Pro",
+      "price": "$99/month",
+      "description": "10,000 AI credits. Autonomous commerce mode, browser agent, multi-agent orchestration."
+    }
+  ],
+  "features": [
+    "Natural language store management",
+    "7 autonomous AI agents (24/7 operation)",
+    "Multi-step goal planning with self-healing",
+    "Predictive demand forecasting",
+    "Competitor price intelligence",
+    "Product discovery and evaluation",
+    "Guardian Mode — proactive store monitoring",
+    "One-click undo for every action",
+    "Full audit trail and decision history",
+    "Long-term semantic memory (RAG)",
+    "Multi-language (English, Arabic, French)",
+    "Dark/light theme sync",
+    "MCP Server for external AI assistant integration",
+    "WCAG 2.1 AA accessible",
+    "Kill switch for emergency shutdown"
+  ],
+  "requirements": {
+    "minShopifyPlan": "Basic",
+    "supportedBrowsers": ["Chrome", "Firefox", "Safari", "Edge"],
+    "mobileOptimized": true,
+    "languages": ["English", "Arabic (Moroccan business)"]
+  },
+  "developer": {
+    "name": "",
+    "email": "support@vanta-os.example.com",
+    "website": "https://vanta-os.example.com",
+    "privacyPolicyUrl": "/app/privacy",
+    "termsOfServiceUrl": "/app/terms"
+  },
+  "compliance": {
+    "gdprCompliant": true,
+    "ccpaCompliant": true,
+    "pipedaCompliant": true,
+    "mandatoryWebhooks": [
+      "customers/redact",
+      "customers/data_request",
+      "shop/redact",
+      "app/uninstalled",
+      "app/scopes_update"
+    ],
+    "dataDeletionWindowHours": 48,
+    "hmacVerification": true,
+    "cspHeaders": true,
+    "frameAncestors": ["https://*.myshopify.com", "https://admin.shopify.com"]
+  },
+  "testCredentials": {
+    "testStoreUrl": "vanta-os-test.myshopify.com",
+    "reviewerEmail": "reviewer@vanta-os-test.myshopify.com",
+    "reviewerPassword": "VantaReview2026!",
+    "credentialsPageUrl": "/app/test-credentials"
+  },
+  "apiVersion": "2025-04",
+  "embedded": true,
+  "builtForShopify": true
+}
