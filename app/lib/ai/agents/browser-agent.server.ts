@@ -1,20 +1,9 @@
 // =============================================================================
 // VANTA OS — Browser Agent
 // =============================================================================
-// A merchant-authorized browser automation tool. It is SUBORDINATE to the
-// agent system — it never initiates actions. It receives instructions from
-// Planner, Research, Analyst, and Reviewer agents.
-//
-// Architecture:
-//   - Uses Playwright (production-grade browser automation)
-//   - Multi-tenant: each merchant gets isolated browser sessions
-//   - Session persistence: cookies + localStorage saved between runs
-//   - Recovery: failed steps can be retried with checkpoint resumption
-//   - Full audit: every action logged with screenshot + timing
-//   - Approval gates: sensitive actions require merchant approval
-//
-// CRITICAL: This is a TOOL of the agent system, NOT the system itself.
-//       No email/password storage. No third-party platform login automation.
+// A merchant-authorized browser automation tool. Subordinate to the agent system.
+// Uses Playwright when installed; returns clear "not available" status otherwise.
+// No credential-based authentication. No email/password storage.
 // =============================================================================
 
 import { prisma } from "~/lib/db.server";
@@ -86,7 +75,7 @@ export async function createBrowserSession(
       connectedAccountId,
       sessionKey,
       status: "IDLE",
-      userAgent: "VANTA-OS-Browser-Agent/1.0 (merchant-authorized)",
+      userAgent: "VANTA-OS-Browser-Agent/1.0",
       viewport: { width: 1280, height: 720 },
     },
   });
@@ -166,8 +155,6 @@ export async function executeBrowserWorkflow(
     data: { status: "RUNNING", startedAt: new Date(), attemptCount: { increment: 1 } },
   });
 
-  // Connected accounts use apiKey-based official API integration, not browser login.
-
   for (let i = workflow.currentStep; i < steps.length; i++) {
     const step = steps[i];
 
@@ -211,7 +198,7 @@ export async function executeBrowserWorkflow(
       await trace.complete({ status: "ERROR", errorMessage: errorMsg });
       const currentAttempt = await prisma.browserWorkflow.findUnique({ where: { id: workflowId }, select: { attemptCount: true, maxAttempts: true } });
       if (currentAttempt && currentAttempt.attemptCount < currentAttempt.maxAttempts) {
-        logger.warn("Browser step failed — will retry", { workflowId, step: i + 1, attempt: currentAttempt.attemptCount, error: errorMsg });
+        logger.warn("Browser step failed — retrying", { workflowId, step: i + 1, error: errorMsg });
         await new Promise((r) => setTimeout(r, 2000 * currentAttempt.attemptCount));
         i--;
         continue;
@@ -229,6 +216,8 @@ export async function executeBrowserWorkflow(
 
 /**
  * Execute a single browser action.
+ * Attempts to use Playwright if installed. If Playwright is not available,
+ * returns a clear error if Playwright is not installed.
  */
 async function executeBrowserAction(
   sessionId: string,
@@ -236,36 +225,146 @@ async function executeBrowserAction(
   step: BrowserStep,
 ): Promise<{ success: boolean; data?: unknown; screenshot?: string }> {
   const startTime = Date.now();
+  const session = await prisma.browserSession.findUnique({ where: { id: sessionId }, select: { shopDomain: true } });
+  const shopDomain = session?.shopDomain ?? "";
+
   const action = await prisma.browserAction.create({
     data: {
-      shopDomain: (await prisma.browserSession.findUnique({ where: { id: sessionId }, select: { shopDomain: true } }))?.shopDomain ?? "",
-      sessionId, workflowId, stepNumber: 0, actionType: step.action, target: step.target, value: step.value, status: "RUNNING", startedAt: new Date(),
+      shopDomain, sessionId, workflowId, stepNumber: 0,
+      actionType: step.action, target: step.target, value: step.value,
+      status: "RUNNING", startedAt: new Date(),
     },
   });
 
   try {
     let resultData: unknown = null;
-    logger.info("Browser action executed", { sessionId, action: step.action, target: step.target, description: step.description });
+
+    // Attempt to dynamically import Playwright
+    let playwrightAvailable = false;
+    try {
+      await import("playwright");
+      playwrightAvailable = true;
+    } catch {
+      // Playwright not installed — will handle below
+    }
+
+    if (!playwrightAvailable) {
+      throw new Error(
+        "Playwright is not installed. Browser automation requires: npm install playwright && npx playwright install chromium"
+      );
+    }
+
+    // Real Playwright execution
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+    });
+
+    // Restore session state if available
+    const fullSession = await prisma.browserSession.findUnique({ where: { id: sessionId }, select: { storageState: true } });
+    if (fullSession?.storageState) {
+      await context.addCookies(fullSession.storageState as never[]);
+    }
+
+    const page = await context.newPage();
 
     switch (step.action) {
-      case "NAVIGATE": resultData = { url: step.target, title: "Page loaded" }; break;
-      case "CLICK": resultData = { clicked: step.target }; break;
-      case "INPUT": resultData = { filled: step.target, value: step.value }; break;
-      case "EXTRACT": resultData = { extracted: "Extracted text" }; break;
-      case "SCREENSHOT": resultData = { screenshot: "data:image/png;base64,simulated" }; break;
-      default: resultData = { action: step.action, completed: true };
+      case "NAVIGATE":
+        if (!step.target) throw new Error("NAVIGATE requires a target URL");
+        await page.goto(step.target, { waitUntil: "networkidle", timeout: 30000 });
+        resultData = { url: page.url(), title: await page.title() };
+        break;
+
+      case "CLICK":
+        if (!step.target) throw new Error("CLICK requires a CSS selector");
+        await page.click(step.target, { timeout: 10000 });
+        resultData = { clicked: step.target };
+        break;
+
+      case "INPUT":
+        if (!step.target || step.value === undefined) throw new Error("INPUT requires target and value");
+        await page.fill(step.target, step.value, { timeout: 10000 });
+        resultData = { filled: step.target, value: step.value };
+        break;
+
+      case "SELECT":
+        if (!step.target || step.value === undefined) throw new Error("SELECT requires target and value");
+        await page.selectOption(step.target, step.value, { timeout: 10000 });
+        resultData = { selected: step.target, value: step.value };
+        break;
+
+      case "WAIT":
+        if (step.waitFor) {
+          await page.waitForSelector(step.waitFor, { timeout: 10000 });
+          resultData = { waitedFor: step.waitFor };
+        } else {
+          await page.waitForTimeout(1000);
+          resultData = { waited: 1000 };
+        }
+        break;
+
+      case "SCREENSHOT":
+        const screenshotBuffer = await page.screenshot({ type: "png", fullPage: false });
+        const screenshotBase64 = `data:image/png;base64,${screenshotBuffer.toString("base64")}`;
+        resultData = { screenshot: screenshotBase64 };
+        break;
+
+      case "SCROLL":
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        resultData = { scrolled: "bottom" };
+        break;
+
+      case "EXTRACT":
+        if (!step.target) throw new Error("EXTRACT requires a CSS selector");
+        const text = await page.textContent(step.target, { timeout: 10000 });
+        resultData = { extracted: text };
+        break;
+
+      case "CLOSE":
+        await page.close();
+        resultData = { closed: true };
+        break;
+
+      default:
+        throw new Error(`Unknown action type: ${step.action}`);
     }
 
-    if (step.waitFor) {
-      await new Promise((r) => setTimeout(r, 500));
-      resultData = { ...resultData as object, waitedFor: step.waitFor };
-    }
+    // Save session state (cookies) for persistence
+    const cookies = await context.cookies();
+    await saveSessionState(sessionId, cookies);
 
-    await prisma.browserAction.update({ where: { id: action.id }, data: { status: "SUCCESS", resultData: resultData as Record<string, unknown>, completedAt: new Date(), durationMs: Date.now() - startTime } });
-    return { success: true, data: resultData, screenshot: step.screenshot ? "data:image/png;base64,simulated" : undefined };
+    await browser.close();
+
+    await prisma.browserAction.update({
+      where: { id: action.id },
+      data: {
+        status: "SUCCESS",
+        resultData: resultData as Record<string, unknown>,
+        screenshotUrl: step.screenshot ? (resultData as { screenshot?: string })?.screenshot : undefined,
+        completedAt: new Date(),
+        durationMs: Date.now() - startTime,
+      },
+    });
+
+    logger.info("Browser action executed", { sessionId, action: step.action, target: step.target });
+
+    return {
+      success: true,
+      data: resultData,
+      screenshot: step.screenshot ? (resultData as { screenshot?: string })?.screenshot : undefined,
+    };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    await prisma.browserAction.update({ where: { id: action.id }, data: { status: "FAILED", errorMessage: errorMsg, completedAt: new Date(), durationMs: Date.now() - startTime } });
+    await prisma.browserAction.update({
+      where: { id: action.id },
+      data: {
+        status: "FAILED",
+        errorMessage: errorMsg,
+        completedAt: new Date(),
+        durationMs: Date.now() - startTime,
+      },
+    });
     throw err;
   }
 }
