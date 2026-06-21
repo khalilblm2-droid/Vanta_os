@@ -1,7 +1,6 @@
 // =============================================================================
 // VANTA OS — AES-256-GCM Encryption Layer (2026)
 // Uses AES-256-GCM + scrypt key derivation.
-// FIX: SALT is now read from ENCRYPTION_SALT env var (stable across restarts).
 // =============================================================================
 
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync, pbkdf2Sync } from "node:crypto";
@@ -9,7 +8,6 @@ import { getSecret } from "~/lib/security/secrets-vault";
 
 const KEY_LEN = 32; // 256-bit
 
-// FIX: SALT must be stable across server restarts.
 // Read from ENCRYPTION_SALT env var (32-byte hex string).
 // In development, use a fixed fallback with a warning.
 function getStableSalt(): Buffer {

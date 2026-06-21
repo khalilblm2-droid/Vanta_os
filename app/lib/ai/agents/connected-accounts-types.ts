@@ -1,5 +1,4 @@
 // Client-safe types + constants for Connected Accounts (no Prisma imports)
-// FIX: Removed email-password-based account types (email/password-based).
 // Only apiKey-based official API integrations remain.
 export type AccountType =
   | "LOGISTICS"

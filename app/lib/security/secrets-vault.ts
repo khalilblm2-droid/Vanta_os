@@ -12,9 +12,6 @@
 //   - Keys never serialized to JSON responses
 //   - Startup validation with clear error messages
 //
-// FIX: Removed hardcoded SALT — now read from VAULT_SALT env var.
-// FIX: Removed unused WHATSAPP/TIKTOK/ALCHEMY secret types.
-// FIX: Renamed from "Quantum-Resistant" to accurate "AES-256-GCM encryption at rest".
 // =============================================================================
 
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
@@ -23,7 +20,6 @@ import { resolve } from "node:path";
 
 // --- Types -------------------------------------------------------------------
 
-// FIX: Removed WHATSAPP_BUSINESS_TOKEN, TIKTOK_SHOP_ACCESS_TOKEN, ALCHEMY_API_KEY
 export type SecretKey =
   | "SHOPIFY_API_KEY"
   | "SHOPIFY_API_SECRET"
@@ -45,7 +41,6 @@ interface VaultEntry {
 
 const REDACTED = "[REDACTED]";
 
-// FIX: Removed WHATSAPP/TIKTOK/ALCHEMY from default redaction list
 export function redactSecrets<T>(obj: T, keys: SecretKey[] = [
   "SHOPIFY_API_KEY",
   "SHOPIFY_API_SECRET",
@@ -75,7 +70,6 @@ export function redactSecrets<T>(obj: T, keys: SecretKey[] = [
 
 const VAULT_FILE = resolve(process.cwd(), ".env.vault");
 
-// FIX: Removed hardcoded SALT. Read from VAULT_SALT env var.
 // Fails startup with clear error if missing — no insecure fallback.
 function getVaultSalt(): Buffer {
   const salt = process.env.VAULT_SALT;
@@ -198,7 +192,6 @@ class SecretsVault {
     return { valid: missing.length === 0, missing };
   }
 
-  // FIX: Removed WHATSAPP/TIKTOK/ALCHEMY from createVault key list
   createVault(passphrase: string): void {
     const entries: VaultEntry[] = [];
     const keys: SecretKey[] = [

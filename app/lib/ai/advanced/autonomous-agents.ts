@@ -75,7 +75,7 @@ const AGENTS: AutonomousAgent[] = [
   {
     id: "trend-scout",
     name: "Trend Scout",
-    goal: "Scan TikTok/Instagram for trending products matching our catalog",
+    goal: "Scan social media for trending products matching our catalog",
     schedule: "0 12 * * *", // daily at noon
     lastRun: null,
     status: "IDLE",

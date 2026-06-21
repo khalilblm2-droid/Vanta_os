@@ -27,7 +27,6 @@ import { getSecurityHeaders } from "~/lib/security/headers";
 import { cn } from "~/lib/utils";
 
 export async function loader(args: LoaderFunctionArgs) {
-  // FIX: Do NOT wrap in try/catch. shopify.authenticate.admin() throws
   // a Response (redirect) when the user is not authenticated. If we catch
   // that Response and do our own redirect, we break the embedded auth flow
   // and the app shows a blank screen.

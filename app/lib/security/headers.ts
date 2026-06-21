@@ -12,13 +12,10 @@ import { loadEnv } from "~/lib/env.server";
  * Build the CSP string for the current environment.
  * `appOrigin` is the public URL of the VANTA OS app server.
  *
- * FIX: Added 'unsafe-inline' to script-src because Remix injects inline
  * scripts for hydration data. Without this, the browser blocks the
  * inline script and React never hydrates → blank screen.
  *
- * FIX: Added 'unsafe-eval' for development (Vite HMR requires it).
  *
- * FIX: The app origin must be in both script-src AND connect-src.
  */
 export function buildCspHeader(appOrigin: string, isDev: boolean = false): string {
   const directives = [
@@ -60,7 +57,6 @@ export function getSecurityHeaders(): Record<string, string> {
     "Content-Security-Policy": buildCspHeader(e.APP_URL, isDev),
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "X-Content-Type-Options": "nosniff",
-    // FIX: X-Frame-Options ALLOWALL is required for embedded apps.
     // The actual framing is controlled by CSP frame-ancestors above.
     "X-Frame-Options": "ALLOWALL",
     "Referrer-Policy": "strict-origin-when-cross-origin",

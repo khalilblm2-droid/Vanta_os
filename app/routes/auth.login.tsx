@@ -3,7 +3,6 @@
 // Delegates to @shopify/shopify-app-remix's authenticate.login() — NO hand-rolled
 // token exchange. (Section 5.1)
 //
-// FIX: For unstable_newEmbeddedAuthStrategy, the login route must be a
 // resource route (no default export). The loader handles the entire flow.
 // =============================================================================
 

@@ -37,7 +37,6 @@ export const shopify: ShopifyApp = shopifyApp({
   appUrl: e.SHOPIFY_APP_URL,
   authPathPrefix: "/auth",
   sessionStorage,
-  // FIX: Use AppDistribution.Custom for private/custom apps.
   // AppDistribution.AppStore causes different auth behavior that
   // can result in blank screen for custom apps.
   distribution: AppDistribution.Custom,
@@ -121,7 +120,6 @@ export const shopify: ShopifyApp = shopifyApp({
   future: {
     unstable_newEmbeddedAuthStrategy: true,
   },
-  // FIX: Removed unstable_removeRestAdminApi — it was causing REST API
   // calls to fail silently, which broke some Polaris components that
   // rely on REST endpoints internally.
   ...(process.env.NODE_ENV !== "production" ? { dev: true } : {}),

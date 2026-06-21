@@ -6,7 +6,6 @@
 import { useEffect, type ReactNode } from "react";
 import { AppProvider } from "@shopify/polaris";
 
-// CRITICAL FIX: Use the correct CSS path for Polaris v13+ in Vite.
 // The old path "@shopify/polaris/build/esm/styles.css" does not resolve
 // correctly in Vite's dependency optimizer. Use the package root path.
 import "@shopify/polaris/build/esm/styles.css";

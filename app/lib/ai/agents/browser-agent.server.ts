@@ -14,7 +14,6 @@
 //   - Approval gates: sensitive actions require merchant approval
 //
 // CRITICAL: This is a TOOL of the agent system, NOT the system itself.
-// FIX: Removed LOGIN action type and all credential-based authentication.
 //       No email/password storage. No third-party platform login automation.
 // =============================================================================
 
@@ -28,7 +27,6 @@ import { isKillSwitchOn } from "~/lib/shopify/multi-tenant";
 
 // --- Types -------------------------------------------------------------------
 
-// FIX: Removed LOGIN action type — no credential-based authentication
 export type BrowserActionType =
   | "NAVIGATE"
   | "CLICK"
@@ -168,7 +166,6 @@ export async function executeBrowserWorkflow(
     data: { status: "RUNNING", startedAt: new Date(), attemptCount: { increment: 1 } },
   });
 
-  // FIX: Removed the LOGIN step that used stored credentials.
   // Connected accounts use apiKey-based official API integration, not browser login.
 
   for (let i = workflow.currentStep; i < steps.length; i++) {
@@ -198,7 +195,6 @@ export async function executeBrowserWorkflow(
     });
 
     try {
-      // FIX: Removed context parameter that carried credentials
       const result = await executeBrowserAction(sessionId!, workflowId, step);
       completedSteps = i + 1;
       if (result.screenshot) screenshots.push(result.screenshot);
@@ -233,7 +229,6 @@ export async function executeBrowserWorkflow(
 
 /**
  * Execute a single browser action.
- * FIX: Removed context parameter with credentials. No LOGIN action.
  */
 async function executeBrowserAction(
   sessionId: string,
@@ -258,7 +253,6 @@ async function executeBrowserAction(
       case "INPUT": resultData = { filled: step.target, value: step.value }; break;
       case "EXTRACT": resultData = { extracted: "Extracted text" }; break;
       case "SCREENSHOT": resultData = { screenshot: "data:image/png;base64,simulated" }; break;
-      // FIX: LOGIN case removed entirely
       default: resultData = { action: step.action, completed: true };
     }
 

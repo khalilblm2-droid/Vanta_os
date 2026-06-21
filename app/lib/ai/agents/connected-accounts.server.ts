@@ -1,7 +1,6 @@
 // =============================================================================
 // VANTA OS — Connected Accounts Manager
 // Manages merchant-owned external accounts via official API keys only.
-// No email/password credential storage. No browser login automation.
 // Credentials are encrypted at rest using AES-256-GCM.
 // =============================================================================
 
@@ -37,7 +36,6 @@ export interface ConnectedAccountInfo {
 /**
  * Connect a merchant-owned account using an API key.
  * Credentials are encrypted before storage — never stored in plaintext.
- * Only apiKey-based credentials are accepted — no email/password pairs.
  */
 export async function connectAccount(
   shopDomain: string,
@@ -159,7 +157,6 @@ export async function hasConnectedAccount(shopDomain: string, accountType: Accou
 
 /**
  * Get supported account types with descriptions.
- * FIX: Only apiKey-based official API integrations. No email/password fields.
  */
 export const SUPPORTED_ACCOUNT_TYPES: Array<{ type: AccountType; label: string; description: string; requiredFields: string[] }> = [
   {
