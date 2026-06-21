@@ -1,327 +1,157 @@
-# VANTA OS — دليل الإعداد الكامل على Replit
-
-> **ملاحظة مهمة:** تم وضع مفاتيحك في ملف `.env` جاهزة. تحتاج فقط لتحديث URL الخاص بـ Replit وقاعدة البيانات.
+# VANTA OS — Render Deployment Guide
 
 ---
 
-## 📋 ما تحتاجه قبل البدء
+## Prerequisites
 
-1. ✅ حساب Replit (مجاني)
-2. ✅ حساب Shopify Partner (مجاني على partners.shopify.com)
-3. ✅ متجر تطوير Shopify (dev store)
-4. ✅ تم استخراج المفاتيح من Shopify Partner Dashboard:
-   - `SHOPIFY_API_KEY`: `REPLACE_WITH_YOUR_SHOPIFY_API_KEY`
-   - `SHOPIFY_API_SECRET`: `REPLACE_WITH_YOUR_SHOPIFY_API_SECRET`
-5. ✅ تم استخراج مفتاح Gemini:
-   - `GEMINI_API_KEY`: `REPLACE_WITH_YOUR_GEMINI_API_KEY`
+1. GitHub account with the Vanta_os repository
+2. Render account (https://render.com — free signup)
+3. PostgreSQL database (Render provides managed Postgres)
+4. Redis instance (Render provides managed Redis)
+5. Shopify Partner account with app credentials
+6. Google Gemini API key
 
 ---
 
-## 🚀 الخطوة 1: إنشاء مشروع Replit
+## Step 1: Create PostgreSQL Database on Render
 
-1. اذهب إلى [replit.com](https://replit.com)
-2. اضغط **"Create Repl"**
-3. اختر template: **"Node.js"**
-4. اسم المشروع: `vanta-os`
-5. اضغط **"Create Repl"**
+1. Go to https://dashboard.render.com
+2. Click **New +** → **PostgreSQL**
+3. Name: `vanta-os-db`
+4. Plan: **Free** (or Starter for production)
+5. Click **Create Database**
+6. Copy the **Internal Database URL** — you'll need it
+7. Copy the **External Database URL** — for migrations
 
----
+## Step 2: Create Redis Instance on Render
 
-## 📦 الخطوة 2: رفع المشروع
+1. Click **New +** → **Redis**
+2. Name: `vanta-os-redis`
+3. Plan: **Free**
+4. Click **Create Redis**
+5. Copy the **Redis URL**
 
-### الطريقة 1: عبر ملف ZIP
+## Step 3: Deploy the Web Service
 
-1. فك ضغط `vanta-os.zip` على جهازك
-2. في Replit، افتح **Shell**
-3. ارفع الملفات عبر drag & drop في لوحة الملفات
+1. Click **New +** → **Web Service**
+2. Connect your GitHub account if not already connected
+3. Select the `Vanta_os` repository
+4. Configure:
+   - **Name:** `vanta-os`
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npx prisma generate && npx prisma migrate deploy && npm run build`
+   - **Start Command:** `npm run start`
+   - **Plan:** Free (or Starter for production)
+5. Add Environment Variables (see Step 5 below)
+6. Click **Create Web Service**
 
-### الطريقة 2: عبر Git (موصى به)
+## Step 4: Deploy the Background Worker (CRITICAL)
 
-```bash
-# في Shell الخاص بـ Replit
-git clone https://github.com/yourusername/vanta-os.git .
+> Without this worker, tasks will never be processed.
+
+1. Click **New +** → **Background Worker**
+2. Select the same `Vanta_os` repository
+3. Configure:
+   - **Name:** `vanta-os-worker`
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npx prisma generate`
+   - **Start Command:** `npm run start:worker`
+   - **Plan:** Free (or Starter for production)
+4. Add the SAME Environment Variables as the web service (copy all)
+5. Click **Create Background Worker**
+
+## Step 5: Environment Variables
+
+Add these to BOTH the Web Service and the Background Worker:
+
+### Required (from Shopify Partner Dashboard):
+```
+SHOPIFY_API_KEY=your_shopify_api_key
+SHOPIFY_API_SECRET=your_shopify_api_secret
 ```
 
----
-
-## 🔧 الخطوة 3: تثبيت الحزم
-
-في **Shell** Replit:
-
-```bash
-npm install
+### Required (from Google AI Studio):
+```
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-سيقوم هذا تلقائياً بـ:
-- تثبيت كل الحزم
-- تشغيل `prisma generate` (بفضل `postinstall` script)
-
----
-
-## 🗄️ الخطوة 4: إعداد قاعدة البيانات
-
-### في Replit:
-
-1. في لوحة **Tools** (يسار الشاشة)، اضغط على **Database**
-2. اضغط **"Create Database"**
-3. اختر **PostgreSQL**
-4. انسخ **Connection String** (يبدأ بـ `postgresql://...`)
-
-### تحديث ملف `.env`:
-
-افتح ملف `.env` وعدّل هذين السطرين:
-
-```env
-DATABASE_URL="postgresql://your-actual-connection-string"
-DIRECT_URL="postgresql://your-actual-connection-string"
+### Required (from Render PostgreSQL):
+```
+DATABASE_URL=<Internal Database URL from Render Postgres>
+DIRECT_URL=<External Database URL from Render Postgres>
 ```
 
----
-
-## 🔴 الخطوة 5: إعداد Redis (اختياري للبدء)
-
-> **ملاحظة:** يمكنك تخطي هذه الخطوة في البداية — التطبيق سيعمل بدون Redis للتجربة.
-
-### في Replit:
-
-1. في لوحة **Tools**، اضغط على **Database**
-2. اضغط **"Create Database"**
-3. اختر **Redis**
-4. انسخ **Connection String**
-
-### تحديث ملف `.env`:
-
-```env
-REDIS_URL=redis://your-actual-redis-url
+### Required (from Render Redis):
+```
+REDIS_URL=<Redis URL from Render Redis>
 ```
 
----
-
-## 🌐 الخطوة 6: الحصول على رابط Replit
-
-1. في Replit، اضغط **"Run"** (الزر الأخضر بأعلى الشاشة)
-2. ستحصل على رابط مثل: `https://vanta-os.yourusername.repl.co`
-3. انسخ هذا الرابط
-
-### تحديث ملف `.env`:
-
-افتح `.env` وعدّل:
-
-```env
-APP_URL=https://vanta-os.yourusername.repl.co
-SHOPIFY_APP_URL=https://vanta-os.yourusername.repl.co
+### Required (generate with openssl):
+```
+ENCRYPTION_KEY=<run: openssl rand -base64 32>
+ENCRYPTION_SALT=<run: openssl rand -hex 16>
+VAULT_SALT=<run: openssl rand -hex 16>
+INTERNAL_DOCS_SECRET=<run: openssl rand -hex 32>
+AGENCY_SECRET=<run: openssl rand -hex 32>
 ```
 
----
-
-## 🏗️ الخطوة 7: إنشاء قاعدة البيانات
-
-في **Shell** Replit:
-
-```bash
-# إنشاء الجداول
-npx prisma migrate deploy
-
-# (اختياري) بيانات أولية
-npm run seed
+### Required (your Render URL — fill after first deploy):
+```
+APP_URL=https://vanta-os.onrender.com
+SHOPIFY_APP_URL=https://vanta-os.onrender.com
 ```
 
----
-
-## 🛠️ الخطوة 8: بناء المشروع
-
-```bash
-npm run build
+### Standard config:
+```
+NODE_ENV=production
+APP_ENV=production
+PORT=10000
+SHOPIFY_APP_HANDLE=vanta-os
+SHOPIFY_API_VERSION=2025-04
+SHOPIFY_APP_SCOPES=read_products,write_products,read_inventory,write_inventory,read_locations,read_collections,write_collections,read_metafields,write_metafields,read_themes,read_orders,read_customers,read_price_rules,read_discounts,read_shop_locales,read_markets
+GEMINI_MODEL=gemini-2.0-flash-exp
+WHITELABEL_MODE=false
 ```
 
----
+## Step 6: Update Shopify Partner Dashboard
 
-## ▶️ الخطوة 9: تشغيل التطبيق
+After your web service is deployed, you'll get a URL like:
+`https://vanta-os-xxxx.onrender.com`
 
-### في Replit:
+Update these in your Shopify Partner Dashboard → Apps → Your App → URLs:
 
-اضغط زر **"Run"** الأخضر. أو في Shell:
-
-```bash
-npm run start
-```
-
-### التحقق:
-
-افتح رابط Replit في المتصفح:
-- `https://vanta-os.yourusername.repl.co/health`
-- يجب أن ترى JSON يحتوي على `"status":"ok"`
-
----
-
-## ⚙️ الخطوة 9.5: نشر الـ Background Worker (مهم جداً)
-
-> **تحذير:** بدون هذه الخطوة، المهام (tasks) لن تُعالج أبداً. الـ web server فقط يضع المهام في الطابور (queue) — الـ worker هو الذي ينفذها.
-
-Replit لا يدعم تعريف deploymentين في ملف `.replit` واحد. تحتاج لإنشاء deployment ثاني يدوياً:
-
-1. في Replit، اذهب إلى **Deployments** panel (تبويب Deployments في الأعلى)
-2. اضغط **"Create Deployment"**
-3. اختر نوع **"Background Worker"** (ليس Web Service)
-4. في **Run command**، اكتب:
-   ```
-   npm run start:worker
-   ```
-5. تأكد أن نفس متغيرات البيئة (Environment Variables) موجودة — خاصة:
-   - `DATABASE_URL` (نفس قاعدة البيانات)
-   - `REDIS_URL` (نفس Redis)
-   - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `GEMINI_API_KEY`
-   - كل متغيرات `.env` الأخرى
-6. اضغط **Deploy**
-
-> **التحقق:** بعد النشر، افتح logs الـ worker — يجب أن ترى:
-> ```
-> [VANTA] VANTA OS worker ready
-> ```
-
-بدون هذا الـ worker:
-- المهام تظل في حالة QUEUED للأبد
-- Guardian Mode لا يعمل
-- Recurring Missions لا تنفذ
-- لا توجد معالجة للأخطاء أو self-healing
-
----
-
-## 🛒 الخطوة 10: إعداد Shopify Partner Dashboard
-
-1. اذهب إلى [partners.shopify.com](https://partners.shopify.com)
-2. **Apps** → **Create app** → **Custom app**
-3. اسم التطبيق: `VANTA OS`
-4. اضغط **Create app**
-
-### في إعدادات التطبيق:
-
-#### App setup → URLs:
-- **App URL:** `https://vanta-os.yourusername.repl.co`
+- **App URL:** `https://vanta-os-xxxx.onrender.com`
 - **Allowed redirection URI(s):**
   ```
-  https://vanta-os.yourusername.repl.co/auth/callback
+  https://vanta-os-xxxx.onrender.com/auth/callback
   ```
 
-#### App setup → App preferences:
-- **Embedded:** ✅ مفعّل
+Update Webhooks:
+- **app/uninstalled:** `https://vanta-os-xxxx.onrender.com/webhooks/app/uninstalled`
+- **customers/redact:** `https://vanta-os-xxxx.onrender.com/webhooks/customers/redact`
+- **customers/data_request:** `https://vanta-os-xxxx.onrender.com/webhooks/customers/data_request`
+- **shop/redact:** `https://vanta-os-xxxx.onrender.com/webhooks/shop/redact`
 
-#### Webhooks subscription:
-- اضغط **"Create webhook"** لكل من:
-  - `app/uninstalled` → `https://vanta-os.yourusername.repl.co/webhooks/app/uninstalled`
-  - `customers/redact` → `https://vanta-os.yourusername.repl.co/webhooks/customers/redact`
-  - `customers/data_request` → `https://vanta-os.yourusername.repl.co/webhooks/customers/data_request`
-  - `shop/redact` → `https://vanta-os.yourusername.repl.co/webhooks/shop/redact`
+Update GDPR mandatory webhooks with the same URLs.
 
-#### GDPR mandatory webhooks:
-- نفس الروابط أعلاه
+## Step 7: Install on Your Store
 
----
-
-## 🧪 الخطوة 11: تثبيت التطبيق على متجر التطوير
-
-1. في **Partner Dashboard** → **Apps** → **VANTA OS**
-2. اضغط **"Select store"** → اختر متجر التطوير
-3. اضغط **"Install"**
-4. سيفتح Shopify صفحة الأذونات → اضغط **"Install app"**
-5. سيتم تحويلك إلى تطبيق VANTA OS داخل Shopify Admin
-
----
-
-## ✅ الخطوة 12: التحقق من العمل
-
-### 1. في Shopify Admin:
-- يجب أن يفتح التطبيق ويعرض صفحة **Onboarding**
-- اقبل الشروط → اضغط **"Connect my store"**
-- يجب أن ترى **Dashboard**
-
-### 2. اختبر الـ Agent:
-- اذهب إلى **Agent Canvas**
-- اكتب: "Find all products with 0 inventory"
-- اضغط **Send**
-- يجب أن ترى **Task Card** يتغير لونه من **Queued** → **Thinking** → **Completed**
-
----
-
-## 🐛 حل المشاكل الشائعة
-
-### مشكلة: شاشة بيضاء داخل Shopify
-
-**السبب:** عادة يكون مشكلة CSP أو App Bridge
-
-**الحل:**
-1. افتح DevTools (F12) في المتصفح
-2. اذهب إلى Console
-3. إذا رأيت خطأ `Refused to frame` → تحقق من `APP_URL` في `.env`
-4. إذا رأيت خطأ `App Bridge` → تحقق من `SHOPIFY_API_KEY`
-
-### مشكلة: `Cannot find module '@prisma/client'`
-
-**الحل:**
-```bash
-npx prisma generate
+Visit:
+```
+https://vanta-os-xxxx.onrender.com/auth/login?shop=your-store.myshopify.com
 ```
 
-### مشكلة: `Database connection failed`
+Complete the OAuth flow. The app should appear in your Shopify Admin.
 
-**الحل:**
-1. تحقق من `DATABASE_URL` في `.env`
-2. تأكد أن قاعدة البيانات تعمل في Replit
-3. جرب: `npx prisma db push`
+## Step 8: Verify
 
-### مشكلة: `Redis connection failed`
+- Visit `https://vanta-os-xxxx.onrender.com/health` — should return JSON with `status: ok`
+- Check Render logs for the worker — should show `VANTA OS worker ready`
+- Open the app in Shopify Admin — should show the onboarding page
 
-**الحل:**
-- التطبيق سيعمل بدون Redis (في وضع fallback)
-- لكن BullMQ queue لن يعمل → Tasks لن تُعالج
-- أضف Redis من Replit Database panel
+## Notes
 
-### مشكلة: OAuth redirect loop
-
-**السبب:** `APP_URL` أو `SHOPIFY_APP_URL` خاطئ
-
-**الحل:**
-1. تأكد أن `APP_URL` = `SHOPIFY_APP_URL` = رابط Replit الفعلي
-2. تأكد أن redirect URL في Shopify Dashboard = `https://your-replit-url/auth/callback`
-
-### مشكلة: `Invalid HMAC`
-
-**السبب:** `SHOPIFY_API_SECRET` خاطئ
-
-**الحل:**
-1. تحقق من `SHOPIFY_API_SECRET` في `.env`
-2. تأكد أنه `REPLACE_WITH_YOUR_SHOPIFY_API_SECRET` (المفتاح الذي أعطيته)
-
----
-
-## 📞 الدعم
-
-إذا واجهت مشاكل:
-
-1. افتح DevTools → Console → انسخ الأخطاء
-2. تحقق من `/health` endpoint: `https://your-url.repl.co/health`
-3. تحقق من logs في Replit Shell
-
----
-
-## 🎯 ملخص سريع
-
-```bash
-# 1. ثبّت الحزم
-npm install
-
-# 2. أنشئ قاعدة البيانات
-npx prisma migrate deploy
-
-# 3. ابنِ المشروع
-npm run build
-
-# 4. شغّل
-npm run start
-```
-
-ثم في Shopify Partner Dashboard:
-- App URL: `https://your-replit-url.repl.co`
-- Redirect URL: `https://your-replit-url.repl.co/auth/callback`
-
-ثم ثبّت التطبيق على متجرك. ✅
+- Render free tier services spin down after 15 minutes of inactivity. First request after sleep takes ~30s to wake up.
+- For production, use the **Starter** plan ($7/month) for both web service and worker to avoid spin-down.
+- The worker MUST share the same DATABASE_URL and REDIS_URL as the web service.
+- Migrations run automatically during the build step.

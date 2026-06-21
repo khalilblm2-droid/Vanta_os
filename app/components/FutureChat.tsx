@@ -1,7 +1,7 @@
 // =============================================================================
 // VANTA OS — FutureChat: The Most Advanced AI Conversation Interface
 // =============================================================================
-// Features that surpass Replit, Manus, and every other AI assistant:
+// Features that surpass Render, Manus, and every other AI assistant:
 //
 // 1. Real-time streaming — text appears token by token
 // 2. Agent thinking visualization — watch the AI reason in real-time

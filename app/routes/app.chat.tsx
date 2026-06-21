@@ -1,6 +1,6 @@
 // =============================================================================
 // VANTA OS — Future Chat Route
-// The most advanced AI conversation interface — surpasses Replit, Manus.
+// The most advanced AI conversation interface — surpasses Render, Manus.
 // =============================================================================
 
 import type { LoaderFunctionArgs, HeadersArgs } from "@remix-run/node";
